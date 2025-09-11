@@ -1,0 +1,12 @@
+name: CD Pipeline - Dev
+
+on:
+  push:
+    branches: [ "main" ]  # Or "dev" if you're using a dev branch
+
+jobs:
+  dev-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print Dev Pipeline Message
+        run: echo "This is a dev account pipeline for the nasty dev team."
