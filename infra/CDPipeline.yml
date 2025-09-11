@@ -1,10 +1,17 @@
 name: Deploy to Dev
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - dev
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      # Your deploy logic here
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Add your real deploy logic here
+      - name: Simulate deployment
+        run: echo "Deploying Dev branch..."
