@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION = 'us-east-2' // ✅ Corrected to match your ECR region
-        ECR_REPO_URI = '345594588963.dkr.ecr.us-east-2.amazonaws.com/heathjavasamplerepo' // ✅ Your actual ECR URI
+        AWS_REGION = 'us-east-2' // ✅ Matches your ECR region
+        ECR_REPO_URI = '345594588963.dkr.ecr.us-east-2.amazonaws.com/heathjavasamplerepo' // ✅ Correct URI
         JAVA_HOME = tool name: 'jdk17', type: 'jdk'
         PATH = "${JAVA_HOME}/bin:${env.PATH}"
     }
@@ -15,7 +15,7 @@ pipeline {
     stages {
         stage('Checkout Code') {
             steps {
-                checkout scm
+                git branch: 'main', url: 'https://github.com/heathfrantz91-sys/heathjavasamplerepo.git'
             }
         }
 
@@ -29,7 +29,7 @@ pipeline {
             steps {
                 withCredentials([
                     usernamePassword(
-                        credentialsId: 'AKIAVA5YK54RVVRW35GX', // Jenkins credential ID for AWS
+                        credentialsId: 'AKIAVA5YK54RVVRW35GX', // AWS credentials stored in Jenkins
                         usernameVariable: 'AWS_ACCESS_KEY_ID',
                         passwordVariable: 'AWS_SECRET_ACCESS_KEY'
                     )
