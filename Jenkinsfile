@@ -2,8 +2,9 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION = 'us-east-1' // ✅ Matches your ECR region
-        ECR_REPO_URI = '345594588963.dkr.ecr.us-east-1.amazonaws.com/heathjavasamplerepo' // ✅ Correct URI
+        AWS_REGION = 'us-east-1' // ✅ Your actual region
+        ECR_REPO_NAME = 'heathjavasamplerepo'
+        ECR_REPO_URI = "345594588963.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.ECR_REPO_NAME}"
         JAVA_HOME = tool name: 'jdk17', type: 'jdk'
         PATH = "${JAVA_HOME}/bin:${env.PATH}"
     }
@@ -25,22 +26,30 @@ pipeline {
             }
         }
 
-        stage('Login to AWS ECR') {
+        stage('Login to AWS ECR & Ensure Repo Exists') {
             steps {
                 withCredentials([
                     usernamePassword(
-                        credentialsId: 'AKIAVA5YK54RVVRW35GX', // AWS credentials stored in Jenkins
+                        credentialsId: 'AKIAVA5YK54RVVRW35GX',
                         usernameVariable: 'AWS_ACCESS_KEY_ID',
                         passwordVariable: 'AWS_SECRET_ACCESS_KEY'
                     )
                 ]) {
                     sh '''
+                        set -e
+
+                        # Configure AWS CLI
                         aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
                         aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
                         aws configure set region $AWS_REGION
 
+                        # Log in to ECR
                         aws ecr get-login-password --region $AWS_REGION | \
                         docker login --username AWS --password-stdin $ECR_REPO_URI
+
+                        # Ensure ECR repo exists (create if not)
+                        aws ecr describe-repositories --repository-names $ECR_REPO_NAME --region $AWS_REGION || \
+                        aws ecr create-repository --repository-name $ECR_REPO_NAME --region $AWS_REGION
                     '''
                 }
             }
@@ -48,6 +57,9 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
+                // Optional: clean cache to avoid stale errors
+                // sh 'docker builder prune -f'
+
                 sh 'docker build -t $ECR_REPO_URI:latest -f Dockerfile .'
             }
         }
