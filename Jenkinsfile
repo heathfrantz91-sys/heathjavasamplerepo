@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION = 'us-east-2' // ✅ Matches your ECR region
+        AWS_REGION = 'us-east-1' // ✅ Matches your ECR region
         ECR_REPO_URI = '345594588963.dkr.ecr.us-east-2.amazonaws.com/heathjavasamplerepo' // ✅ Correct URI
         JAVA_HOME = tool name: 'jdk17', type: 'jdk'
         PATH = "${JAVA_HOME}/bin:${env.PATH}"
