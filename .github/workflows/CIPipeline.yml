@@ -1,13 +1,16 @@
-name: Java-CI-With-Maven
+name: CI - Build and Push Docker Image to ECR
 
 on:
-  pull_request:
-    branches: [ "main" ]
   push:
-    branches: [ "main" ]
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
 
 jobs:
-  build:
+  build-and-push:
+    name: Build and Push Docker Image
     runs-on: ubuntu-latest
 
     permissions:
@@ -26,5 +29,36 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Build with Maven
-        run: mvn -B package --file pom.xml
+      - name: Install Maven
+        run: |
+          sudo apt update
+          sudo apt install -y maven
+
+      - name: Make Maven wrapper executable
+        run: chmod +x Sample-ecs/demo/mvnw
+
+      - name: Build application
+        run: ./mvnw clean package
+        working-directory: Sample-ecs/demo
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Log in to Amazon ECR
+        run: |
+          aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${{ secrets.ECR_REPO_URI }}
+
+      - name: Build Docker image
+        working-directory: Sample-ecs/demo
+        run: |
+          sudo docker build -t ${{ secrets.ECR_REPO_URI }}:latest -f dockerfile .
+
+      - name: Push Docker image to ECR
+        working-directory: Sample-ecs/demo
+        run: |
+          sudo docker push ${{ secrets.ECR_REPO_URI }}:latest
