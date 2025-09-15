@@ -2,9 +2,8 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION = 'us-east-1' // ✅ Your actual region
+        AWS_REGION = 'us-east-1'
         ECR_REPO_NAME = 'heathjavasamplerepo'
-        ECR_REPO_URI = "345594588963.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.ECR_REPO_NAME}"
         JAVA_HOME = tool name: 'jdk17', type: 'jdk'
         PATH = "${JAVA_HOME}/bin:${env.PATH}"
     }
@@ -35,19 +34,21 @@ pipeline {
                         passwordVariable: 'AWS_SECRET_ACCESS_KEY'
                     )
                 ]) {
+                    script {
+                        def ecrRepoUri = "345594588963.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.ECR_REPO_NAME}"
+                        env.ECR_REPO_URI_FINAL = ecrRepoUri
+                    }
+
                     sh '''
                         set -e
 
-                        # Configure AWS CLI
                         aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
                         aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
                         aws configure set region $AWS_REGION
 
-                        # Log in to ECR
                         aws ecr get-login-password --region $AWS_REGION | \
-                        docker login --username AWS --password-stdin $ECR_REPO_URI
+                        docker login --username AWS --password-stdin $ECR_REPO_URI_FINAL
 
-                        # Ensure ECR repo exists (create if not)
                         aws ecr describe-repositories --repository-names $ECR_REPO_NAME --region $AWS_REGION || \
                         aws ecr create-repository --repository-name $ECR_REPO_NAME --region $AWS_REGION
                     '''
@@ -57,16 +58,13 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                // Optional: clean cache to avoid stale errors
-                // sh 'docker builder prune -f'
-
-                sh 'docker build -t $ECR_REPO_URI:latest -f Dockerfile .'
+                sh 'docker build -t $ECR_REPO_URI_FINAL:latest -f Dockerfile .'
             }
         }
 
         stage('Push Docker Image to ECR') {
             steps {
-                sh 'docker push $ECR_REPO_URI:latest'
+                sh 'docker push $ECR_REPO_URI_FINAL:latest'
             }
         }
     }
