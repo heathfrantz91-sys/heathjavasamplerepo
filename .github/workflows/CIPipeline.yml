@@ -26,9 +26,6 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: ☕ Manually export JAVA_HOME (for tools that need it)
-      run: echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
-
     - name: 📦 Build with Maven
       run: ./mvnw clean package
 
@@ -39,6 +36,7 @@ jobs:
         path: './target'
         format: 'HTML'
         out: 'reports'
+        args: '--jpath /opt/java/openjdk/bin/java'
 
     - name: 📊 SonarQube Analysis
       env:
