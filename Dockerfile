@@ -11,4 +11,4 @@ COPY target/heath-0.0.1-SNAPSHOT.jar app.jar
 EXPOSE 8081
 
 # Command to run the JAR
-ENTRYPOINT ["java","-jar","app.jar"]
+ENTRYPOINT ["java", "-Dspring.profiles.active=default", "-jar", "app.jar"]
