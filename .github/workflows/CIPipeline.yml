@@ -1,0 +1,68 @@
+name: CIPipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPO_NAME: heathjavasamplerepo
+  ECR_REPO_URI_FINAL: 345594588963.dkr.ecr.us-east-1.amazonaws.com
+  IMAGE_TAG: ${{ github.run_number }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 🔄 Checkout code
+      uses: actions/checkout@v3
+
+    - name: ☕ Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: 📦 Build with Maven
+      run: ./mvnw clean package
+
+    - name: 🛡️ OWASP Dependency Check
+      uses: dependency-check/Dependency-Check_Action@main
+      with:
+        project: 'heathjavasamplerepo'
+        scanPath: './target'
+
+    - name: 📊 SonarQube Analysis
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      run: |
+        ./mvnw verify sonar:sonar \
+          -Dsonar.projectKey=heathjavasamplerepo \
+          -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+          -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+
+    - name: 🔐 Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: 🔐 Login to ECR
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: 📦 Ensure ECR Repo Exists
+      run: |
+        aws ecr describe-repositories --repository-names $ECR_REPO_NAME || \
+        aws ecr create-repository --repository-name $ECR_REPO_NAME
+
+    - name: 🐳 Build Docker image
+      run: |
+        docker build -t $ECR_REPO_URI_FINAL/$ECR_REPO_NAME:$IMAGE_TAG .
+
+    - name: 📤 Push Docker image
+      run: |
+        docker push $ECR_REPO_URI_FINAL/$ECR_REPO_NAME:$IMAGE_TAG
