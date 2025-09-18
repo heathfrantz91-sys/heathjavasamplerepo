@@ -26,6 +26,9 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
+    - name: ☕ Manually export JAVA_HOME (for tools that need it)
+      run: echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+
     - name: 📦 Build with Maven
       run: ./mvnw clean package
 
@@ -33,7 +36,9 @@ jobs:
       uses: dependency-check/Dependency-Check_Action@main
       with:
         project: 'heathjavasamplerepo'
-        scanPath: './target'
+        path: './target'
+        format: 'HTML'
+        out: 'reports'
 
     - name: 📊 SonarQube Analysis
       env:
