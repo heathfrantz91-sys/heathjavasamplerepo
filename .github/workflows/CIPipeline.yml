@@ -33,11 +33,11 @@ jobs:
       run: |
         curl -L https://github.com/jeremylong/DependencyCheck/releases/download/v8.4.0/dependency-check-8.4.0-release.zip -o dc.zip
         unzip dc.zip -d dependency-check
-        chmod +x dependency-check/bin/dependency-check.sh
+        chmod +x dependency-check/dependency-check/bin/dependency-check.sh
 
     - name: 🛡️ Run OWASP Dependency Check
       run: |
-        ./dependency-check/bin/dependency-check.sh \
+        ./dependency-check/dependency-check/bin/dependency-check.sh \
           --project "heathjavasamplerepo" \
           --scan ./target \
           --format HTML \
