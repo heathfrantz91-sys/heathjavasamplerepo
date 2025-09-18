@@ -29,14 +29,20 @@ jobs:
     - name: 📦 Build with Maven
       run: ./mvnw clean package
 
-    - name: 🛡️ OWASP Dependency Check
-      uses: dependency-check/Dependency-Check_Action@main
-      with:
-        project: 'heathjavasamplerepo'
-        path: './target'
-        format: 'HTML'
-        out: 'reports'
-        args: '--jpath /opt/java/openjdk/bin/java'
+    - name: 🛡️ Install OWASP Dependency Check CLI
+      run: |
+        curl -L https://github.com/jeremylong/DependencyCheck/releases/download/v8.4.0/dependency-check-8.4.0-release.zip -o dc.zip
+        unzip dc.zip -d dependency-check
+        chmod +x dependency-check/bin/dependency-check.sh
+
+    - name: 🛡️ Run OWASP Dependency Check
+      run: |
+        ./dependency-check/bin/dependency-check.sh \
+          --project "heathjavasamplerepo" \
+          --scan ./target \
+          --format HTML \
+          --out reports \
+          --noupdate
 
     - name: 📊 SonarQube Analysis
       env:
