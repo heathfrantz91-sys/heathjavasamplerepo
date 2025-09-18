@@ -41,8 +41,7 @@ jobs:
           --project "heathjavasamplerepo" \
           --scan ./target \
           --format HTML \
-          --out reports \
-          --noupdate
+          --out reports
 
     - name: 📊 SonarQube Analysis
       env:
