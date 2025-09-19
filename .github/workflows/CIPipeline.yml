@@ -48,9 +48,16 @@ jobs:
           chmod +x dependency-check/dependency-check/bin/dependency-check.sh
 
       - name: 🐛 Debug NVD API Key (temporary)
-        run: echo "NVD_API_KEY length: ${#NVD_API_KEY}"
+        shell: bash
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          if [ -z "$NVD_API_KEY" ]; then
+            echo "❌ NVD_API_KEY is not set"
+            exit 1
+          else
+            echo "✅ NVD_API_KEY is set (length: ${#NVD_API_KEY})"
+          fi
 
       - name: 🛡️ Run OWASP Dependency-Check
         env:
