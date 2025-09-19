@@ -19,6 +19,7 @@ env:
   IMAGE_TAG: ${{ github.event.inputs.IMAGE_TAG }}
   SUBNETS: subnet-034c571152a9efc4a,subnet-07047752940465914
   SECURITY_GROUP_ID: sg-0da778c700f3b3915
+  EXECUTION_ROLE_ARN: arn:aws:iam::345594588963:role/ecsTaskExecutionRole  # ✅ Replace if different
 
 jobs:
   deploy:
@@ -40,10 +41,12 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: 📄 Create ECS Task Definition
+        id: register-task
         run: |
           cat > task-def.json <<EOF
           {
             "family": "${{ env.TASK_DEF_NAME }}",
+            "executionRoleArn": "${{ env.EXECUTION_ROLE_ARN }}",
             "networkMode": "awsvpc",
             "requiresCompatibilities": ["FARGATE"],
             "cpu": "256",
@@ -56,7 +59,6 @@ jobs:
                 "portMappings": [
                   {
                     "containerPort": 8080,
-                    "hostPort": 8080,
                     "protocol": "tcp"
                   }
                 ]
@@ -65,14 +67,20 @@ jobs:
           }
           EOF
 
-          aws ecs register-task-definition --cli-input-json file://task-def.json
+          aws ecs register-task-definition \
+            --cli-input-json file://task-def.json \
+            --region $AWS_REGION > task-def-output.json
 
-      - name: 🚀 Update ECS Service
+          echo "TASK_DEF_ARN=$(cat task-def-output.json | jq -r '.taskDefinition.taskDefinitionArn')" >> $GITHUB_ENV
+
+      - name: 🚀 Deploy ECS Service with New Task Definition
         run: |
           aws ecs update-service \
             --cluster $CLUSTER_NAME \
             --service $SERVICE_NAME \
-            --force-new-deployment
+            --task-definition "$TASK_DEF_ARN" \
+            --force-new-deployment \
+            --region $AWS_REGION
 
       - name: ✅ Done
         run: echo "✅ Deployed image tag: $IMAGE_TAG to ECS Fargate"
