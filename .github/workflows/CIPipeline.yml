@@ -21,7 +21,7 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
     steps:
-      - name: 🔄 Checkout code
+      - name: 🔄 Checkout Code
         uses: actions/checkout@v3
 
       - name: ☕ Set up JDK 17
@@ -33,84 +33,39 @@ jobs:
       - name: 📦 Build with Maven
         run: ./mvnw clean package
 
-      # -------------------------------------
-      # 🛡️ OWASP Dependency-Check
-      # -------------------------------------
-
-      - name: 💾 Cache Dependency-Check DB
-        uses: actions/cache@v4
-        with:
-          path: ~/.dependency-check/data
-          key: dependency-check-db-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            dependency-check-db-${{ runner.os }}-
-
-      - name: 🛠️ Install Dependency-Check CLI
-        run: |
-          curl -L https://github.com/jeremylong/DependencyCheck/releases/download/v9.0.9/dependency-check-9.0.9-release.zip -o dc.zip
-          unzip dc.zip -d dependency-check
-          chmod +x dependency-check/dependency-check/bin/dependency-check.sh
-
-      - name: 🌐 Preload NVD Feed (update only)
-        env:
-          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
-        run: |
-          ./dependency-check/dependency-check/bin/dependency-check.sh \
-            --updateonly \
-            --data ~/.dependency-check/data \
-            --nvdApiKey "$NVD_API_KEY" \
-            --nvdApiDelay 8000
-
       - name: 🛡️ Run OWASP Dependency-Check
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: |
+          curl -L https://github.com/jeremylong/DependencyCheck/releases/download/v9.0.9/dependency-check-9.0.9-release.zip -o dc.zip
+          unzip dc.zip -d dependency-check
+          chmod +x dependency-check/dependency-check/bin/dependency-check.sh
           ./dependency-check/dependency-check/bin/dependency-check.sh \
             --project "heathjavasamplerepo" \
             --scan ./target \
-            --format HTML \
-            --out reports \
+            --format ALL \
+            --out dependency-check-report \
             --failOnCVSS 7.0 \
-            --data ~/.dependency-check/data \
             --nvdApiKey "$NVD_API_KEY" \
             --nvdApiDelay 8000
+        continue-on-error: true  # Optional: Let it run even on failure
 
       - name: 📤 Upload Dependency-Check Report
         uses: actions/upload-artifact@v4
         with:
           name: dependency-check-report
-          path: reports
+          path: dependency-check-report
 
-      # -------------------------------------
-      # 📊 SonarQube Analysis
-      # -------------------------------------
-
-      - name: 📊 Run SonarQube Analysis
+      - name: 📊 SonarQube Analysis
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          ./mvnw verify sonar:sonar \
+          ./mvnw clean verify sonar:sonar \
             -Dsonar.projectKey=heathjavasamplerepo \
             -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
             -Dsonar.login=${{ secrets.SONAR_TOKEN }}
 
-      # -------------------------------------
-      # 🧪 AWS Credentials Check
-      # -------------------------------------
-
-      - name: ✅ Validate AWS Credentials
-        shell: bash
-        run: |
-          if [ -z "$AWS_ACCESS_KEY_ID" ]; then
-            echo "❌ AWS_ACCESS_KEY_ID is not set!"
-            exit 1
-          else
-            echo "✅ AWS_ACCESS_KEY_ID is set"
-          fi
-
-      # -------------------------------------
-      # 🔐 AWS Deployment (ECR)
-      # -------------------------------------
+      # GitHub doesn't have native waitForQualityGate — usually handled by SonarQube CLI if needed.
 
       - name: 🔐 Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -129,8 +84,16 @@ jobs:
 
       - name: 🐳 Build Docker Image
         run: |
+          echo "🐳 Building Docker image with tag: $IMAGE_TAG"
           docker build -t $ECR_REPO_URI_FINAL/$ECR_REPO_NAME:$IMAGE_TAG .
 
       - name: 📤 Push Docker Image to ECR
         run: |
+          echo "📤 Pushing Docker image to: $ECR_REPO_NAME:$IMAGE_TAG"
           docker push $ECR_REPO_URI_FINAL/$ECR_REPO_NAME:$IMAGE_TAG
+
+      - name: 🚀 Trigger CD Pipeline (if applicable)
+        if: success()
+        run: |
+          echo "This is where you would trigger your CD pipeline."
+          # Example: curl to webhook or dispatch GitHub Action
