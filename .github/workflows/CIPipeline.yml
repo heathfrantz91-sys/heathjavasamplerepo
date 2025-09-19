@@ -36,16 +36,20 @@ jobs:
         chmod +x dependency-check/dependency-check/bin/dependency-check.sh
 
     - name: 🛡️ Run OWASP Dependency Check
-      env:
-        NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
       run: |
-        export NVD_API_KEY=$NVD_API_KEY
-        ./dependency-check/dependency-check/bin/dependency-check.sh \
+        export NVD_API_KEY="${{ secrets.NVD_API_KEY }}"
+        NVD_API_KEY="${NVD_API_KEY}" ./dependency-check/dependency-check/bin/dependency-check.sh \
           --project "heathjavasamplerepo" \
           --scan ./target \
           --format HTML \
           --out reports \
           --noupdate
+
+    - name: 📤 Upload OWASP Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: owasp-report
+        path: reports/
 
     - name: 📊 SonarQube Analysis
       env:
