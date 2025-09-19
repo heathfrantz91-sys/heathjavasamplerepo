@@ -43,6 +43,22 @@ jobs:
             -Dsonar.login=${{ secrets.SONAR_TOKEN }}
 
       # -------------------------------
+      # 🧪 DEBUG AWS CREDENTIALS
+      # -------------------------------
+
+      - name: 🧪 Debug AWS credentials presence
+        shell: bash
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        run: |
+          if [ -z "$AWS_ACCESS_KEY_ID" ]; then
+            echo "❌ AWS_ACCESS_KEY_ID is not set!"
+            exit 1
+          else
+            echo "✅ AWS_ACCESS_KEY_ID is set"
+          fi
+
+      # -------------------------------
       # 🔐 AWS DEPLOYMENT TO ECR
       # -------------------------------
 
