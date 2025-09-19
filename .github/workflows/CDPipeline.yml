@@ -84,4 +84,3 @@ jobs:
 
       - name: ✅ Done
         run: echo "✅ Deployed image tag: $IMAGE_TAG to ECS Fargate"
-ass
