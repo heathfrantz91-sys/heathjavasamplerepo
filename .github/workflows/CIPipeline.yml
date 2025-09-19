@@ -35,7 +35,7 @@ jobs:
         unzip dc.zip -d dependency-check
         chmod +x dependency-check/dependency-check/bin/dependency-check.sh
 
-    - name: 🛡️ Run OWASP Dependency Check
+    - name: 🛡️ Run OWASP Dependency Check with NVD API
       env:
         NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
       run: |
@@ -48,8 +48,8 @@ jobs:
     - name: 📤 Upload OWASP Report
       uses: actions/upload-artifact@v4
       with:
-        name: owasp-report
-        path: reports/
+        name: dependency-check-report
+        path: reports
 
     - name: 📊 SonarQube Analysis
       env:
