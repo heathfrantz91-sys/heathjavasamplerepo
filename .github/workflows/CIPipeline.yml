@@ -43,7 +43,9 @@ jobs:
           --project "heathjavasamplerepo" \
           --scan ./target \
           --format HTML \
-          --out reports
+          --out reports \
+          --noupdate \
+          --nvdApiKey $NVD_API_KEY
 
     - name: 📊 SonarQube Analysis
       env:
