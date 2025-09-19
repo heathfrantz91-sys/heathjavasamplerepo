@@ -39,13 +39,13 @@ jobs:
       env:
         NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
       run: |
+        export NVD_API_KEY=$NVD_API_KEY
         ./dependency-check/dependency-check/bin/dependency-check.sh \
           --project "heathjavasamplerepo" \
           --scan ./target \
           --format HTML \
           --out reports \
-          --noupdate \
-          --nvdApiKey $NVD_API_KEY
+          --noupdate
 
     - name: 📊 SonarQube Analysis
       env:
