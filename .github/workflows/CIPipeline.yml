@@ -29,9 +29,21 @@ jobs:
       - name: 📦 Build with Maven
         run: ./mvnw clean package
 
+      # -------------------------------
+      # OWASP DEPENDENCY CHECK SECTION
+      # -------------------------------
+
+      - name: 📦 Cache OWASP Dependency-Check DB
+        uses: actions/cache@v4
+        with:
+          path: ~/.dependency-check/data
+          key: dependency-check-db-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            dependency-check-db-${{ runner.os }}-
+
       - name: 🛡️ Install OWASP Dependency Check CLI
         run: |
-          curl -L https://github.com/jeremylong/DependencyCheck/releases/download/v8.4.0/dependency-check-8.4.0-release.zip -o dc.zip
+          curl -L https://github.com/jeremylong/DependencyCheck/releases/download/v9.0.9/dependency-check-9.0.9-release.zip -o dc.zip
           unzip dc.zip -d dependency-check
           chmod +x dependency-check/dependency-check/bin/dependency-check.sh
 
@@ -41,13 +53,19 @@ jobs:
             --project "heathjavasamplerepo" \
             --scan ./target \
             --format HTML \
-            --out reports
+            --out reports \
+            --failOnCVSS 7.0 \
+            --data ~/.dependency-check/data
 
       - name: 📤 Upload OWASP Report
         uses: actions/upload-artifact@v4
         with:
           name: dependency-check-report
           path: reports
+
+      # -------------------------------
+      # SONARQUBE SECTION
+      # -------------------------------
 
       - name: 📊 SonarQube Analysis
         env:
@@ -57,6 +75,10 @@ jobs:
             -Dsonar.projectKey=heathjavasamplerepo \
             -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
             -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+
+      # -------------------------------
+      # AWS DEPLOYMENT SECTION
+      # -------------------------------
 
       - name: 🔐 Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
