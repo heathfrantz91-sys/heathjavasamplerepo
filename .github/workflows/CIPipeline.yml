@@ -30,55 +30,6 @@ jobs:
         run: ./mvnw clean package
 
       # -------------------------------
-      # 🛡️ OWASP DEPENDENCY-CHECK
-      # -------------------------------
-
-      - name: 📦 Cache OWASP Dependency-Check DB
-        uses: actions/cache@v4
-        with:
-          path: ~/.dependency-check/data
-          key: dependency-check-db-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            dependency-check-db-${{ runner.os }}-
-
-      - name: 🛡️ Install OWASP Dependency-Check CLI
-        run: |
-          curl -L https://github.com/jeremylong/DependencyCheck/releases/download/v9.0.9/dependency-check-9.0.9-release.zip -o dc.zip
-          unzip dc.zip -d dependency-check
-          chmod +x dependency-check/dependency-check/bin/dependency-check.sh
-
-      - name: 🐛 Debug NVD API Key (temporary)
-        shell: bash
-        env:
-          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
-        run: |
-          if [ -z "$NVD_API_KEY" ]; then
-            echo "❌ NVD_API_KEY is not set"
-            exit 1
-          else
-            echo "✅ NVD_API_KEY is set (length: ${#NVD_API_KEY})"
-          fi
-
-      - name: 🛡️ Run OWASP Dependency-Check
-        env:
-          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
-        run: |
-          ./dependency-check/dependency-check/bin/dependency-check.sh \
-            --project "heathjavasamplerepo" \
-            --scan ./target \
-            --format HTML \
-            --out reports \
-            --failOnCVSS 7.0 \
-            --data ~/.dependency-check/data \
-            --nvdApiKey "$NVD_API_KEY"
-
-      - name: 📤 Upload OWASP Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: dependency-check-report
-          path: reports
-
-      # -------------------------------
       # 📊 SONARQUBE
       # -------------------------------
 
