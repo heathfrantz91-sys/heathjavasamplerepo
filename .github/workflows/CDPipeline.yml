@@ -1,0 +1,78 @@
+name: CD Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      IMAGE_TAG:
+        description: "Docker image tag to deploy"
+        required: true
+        default: "latest"
+
+env:
+  AWS_REGION: us-east-1
+  CLUSTER_NAME: heath-java-cluster
+  SERVICE_NAME: heath-java-service
+  TASK_DEF_NAME: heath-java-task
+  CONTAINER_NAME: heath-java-container
+  ECR_REPO_URI_FINAL: 345594588963.dkr.ecr.us-east-1.amazonaws.com
+  ECR_REPO_NAME: heathjavasamplerepo
+  IMAGE_TAG: ${{ github.event.inputs.IMAGE_TAG }}
+  SUBNETS: subnet-034c571152a9efc4a,subnet-07047752940465914
+  SECURITY_GROUP_ID: sg-0da778c700f3b3915
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+    steps:
+      - name: 🔄 Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: 🔐 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 📄 Create ECS Task Definition
+        run: |
+          cat > task-def.json <<EOF
+          {
+            "family": "${{ env.TASK_DEF_NAME }}",
+            "networkMode": "awsvpc",
+            "requiresCompatibilities": ["FARGATE"],
+            "cpu": "256",
+            "memory": "512",
+            "containerDefinitions": [
+              {
+                "name": "${{ env.CONTAINER_NAME }}",
+                "image": "${{ env.ECR_REPO_URI_FINAL }}/${{ env.ECR_REPO_NAME }}:${{ env.IMAGE_TAG }}",
+                "essential": true,
+                "portMappings": [
+                  {
+                    "containerPort": 8080,
+                    "hostPort": 8080,
+                    "protocol": "tcp"
+                  }
+                ]
+              }
+            ]
+          }
+          EOF
+
+          aws ecs register-task-definition --cli-input-json file://task-def.json
+
+      - name: 🚀 Update ECS Service
+        run: |
+          aws ecs update-service \
+            --cluster $CLUSTER_NAME \
+            --service $SERVICE_NAME \
+            --force-new-deployment
+
+      - name: ✅ Done
+        run: echo "✅ Deployed image tag: $IMAGE_TAG to ECS Fargate"
