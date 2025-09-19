@@ -1,28 +1,19 @@
-name: CD Pipeline
+name: CI Pipeline
 
 on:
-  workflow_dispatch:
-    inputs:
-      IMAGE_TAG:
-        description: "Docker image tag to deploy"
-        required: true
-        default: "latest"
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
 
 env:
   AWS_REGION: us-east-1
-  CLUSTER_NAME: heath-java-cluster
-  SERVICE_NAME: heath-java-service
-  TASK_DEF_NAME: heath-java-task
-  CONTAINER_NAME: heath-java-container
-  ECR_REPO_URI_FINAL: 345594588963.dkr.ecr.us-east-1.amazonaws.com
   ECR_REPO_NAME: heathjavasamplerepo
-  IMAGE_TAG: ${{ github.event.inputs.IMAGE_TAG }}
-  SUBNETS: subnet-034c571152a9efc4a,subnet-07047752940465914
-  SECURITY_GROUP_ID: sg-0da778c700f3b3915
-  EXECUTION_ROLE_ARN: arn:aws:iam::345594588963:role/ecsTaskExecutionRole  # ✅ Replace if different
+  ECR_REPO_URI_FINAL: 345594588963.dkr.ecr.us-east-1.amazonaws.com
+  IMAGE_TAG: ${{ github.run_number }}
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     env:
@@ -30,8 +21,49 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
     steps:
-      - name: 🔄 Checkout Repository
+      - name: 🔄 Checkout Code
         uses: actions/checkout@v3
+
+      - name: ☕ Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: 📦 Build with Maven
+        run: ./mvnw clean package
+
+      - name: 🛡️ Run OWASP Dependency-Check
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          curl -L https://github.com/jeremylong/DependencyCheck/releases/download/v9.0.9/dependency-check-9.0.9-release.zip -o dc.zip
+          unzip -q dc.zip -d dependency-check
+          chmod +x dependency-check/dependency-check/bin/dependency-check.sh
+          ./dependency-check/dependency-check/bin/dependency-check.sh \
+            --project "heathjavasamplerepo" \
+            --scan ./target \
+            --format ALL \
+            --out dependency-check-report \
+            --failOnCVSS 7.0 \
+            --nvdApiKey "$NVD_API_KEY" \
+            --nvdApiDelay 8000
+        continue-on-error: true
+
+      - name: 📤 Upload Dependency-Check Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: dependency-check-report
+
+      - name: 📊 SonarQube Analysis
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          ./mvnw clean verify sonar:sonar \
+            -Dsonar.projectKey=heathjavasamplerepo \
+            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+            -Dsonar.login=${{ secrets.SONAR_TOKEN }}
 
       - name: 🔐 Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -40,47 +72,33 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: 📄 Create ECS Task Definition
-        id: register-task
+      - name: 🔐 Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: 📦 Ensure ECR Repository Exists
         run: |
-          cat > task-def.json <<EOF
-          {
-            "family": "${{ env.TASK_DEF_NAME }}",
-            "executionRoleArn": "${{ env.EXECUTION_ROLE_ARN }}",
-            "networkMode": "awsvpc",
-            "requiresCompatibilities": ["FARGATE"],
-            "cpu": "256",
-            "memory": "512",
-            "containerDefinitions": [
-              {
-                "name": "${{ env.CONTAINER_NAME }}",
-                "image": "${{ env.ECR_REPO_URI_FINAL }}/${{ env.ECR_REPO_NAME }}:${{ env.IMAGE_TAG }}",
-                "essential": true,
-                "portMappings": [
-                  {
-                    "containerPort": 8080,
-                    "protocol": "tcp"
-                  }
-                ]
-              }
-            ]
-          }
-          EOF
+          aws ecr describe-repositories --repository-names $ECR_REPO_NAME || \
+          aws ecr create-repository --repository-name $ECR_REPO_NAME
 
-          aws ecs register-task-definition \
-            --cli-input-json file://task-def.json \
-            --region $AWS_REGION > task-def-output.json
-
-          echo "TASK_DEF_ARN=$(cat task-def-output.json | jq -r '.taskDefinition.taskDefinitionArn')" >> $GITHUB_ENV
-
-      - name: 🚀 Deploy ECS Service with New Task Definition
+      - name: 🐳 Build Docker Image
         run: |
-          aws ecs update-service \
-            --cluster $CLUSTER_NAME \
-            --service $SERVICE_NAME \
-            --task-definition "$TASK_DEF_ARN" \
-            --force-new-deployment \
-            --region $AWS_REGION
+          echo "🐳 Building Docker image with tag: $IMAGE_TAG"
+          docker build -t $ECR_REPO_URI_FINAL/$ECR_REPO_NAME:$IMAGE_TAG .
 
-      - name: ✅ Done
-        run: echo "✅ Deployed image tag: $IMAGE_TAG to ECS Fargate"
+      - name: 📤 Push Docker Image to ECR
+        run: |
+          echo "📤 Pushing Docker image to: $ECR_REPO_NAME:$IMAGE_TAG"
+          docker push $ECR_REPO_URI_FINAL/$ECR_REPO_NAME:$IMAGE_TAG
+
+      # ✅ Real CD trigger here
+      - name: 🚀 Trigger CD Pipeline via GitHub API
+        if: success()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "🔗 Triggering CDPipeline.yml via API with IMAGE_TAG=${IMAGE_TAG}"
+          curl -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            https://api.github.com/repos/${{ github.repository }}/actions/workflows/CDPipeline.yml/dispatches \
+            -d '{"ref":"main", "inputs":{"IMAGE_TAG":"'"${IMAGE_TAG}"'"}}'
