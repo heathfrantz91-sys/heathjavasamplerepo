@@ -51,6 +51,16 @@ jobs:
           unzip dc.zip -d dependency-check
           chmod +x dependency-check/dependency-check/bin/dependency-check.sh
 
+      - name: 🌐 Preload NVD Feed (update only)
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          ./dependency-check/dependency-check/bin/dependency-check.sh \
+            --updateonly \
+            --data ~/.dependency-check/data \
+            --nvdApiKey "$NVD_API_KEY" \
+            --nvdApiDelay 8000
+
       - name: 🛡️ Run OWASP Dependency-Check
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
