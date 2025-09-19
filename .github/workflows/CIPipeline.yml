@@ -1,4 +1,4 @@
-name: CIPipeline
+name: CI Pipeline
 
 on:
   push:
@@ -15,6 +15,7 @@ env:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -32,11 +33,11 @@ jobs:
       - name: 📦 Build with Maven
         run: ./mvnw clean package
 
-      # -------------------------------
-      # 🛡️ OWASP DEPENDENCY-CHECK
-      # -------------------------------
+      # -------------------------------------
+      # 🛡️ OWASP Dependency-Check
+      # -------------------------------------
 
-      - name: 📦 Cache OWASP Dependency-Check DB
+      - name: 💾 Cache Dependency-Check DB
         uses: actions/cache@v4
         with:
           path: ~/.dependency-check/data
@@ -44,7 +45,7 @@ jobs:
           restore-keys: |
             dependency-check-db-${{ runner.os }}-
 
-      - name: 🛡️ Install OWASP Dependency-Check CLI
+      - name: 🛠️ Install Dependency-Check CLI
         run: |
           curl -L https://github.com/jeremylong/DependencyCheck/releases/download/v9.0.9/dependency-check-9.0.9-release.zip -o dc.zip
           unzip dc.zip -d dependency-check
@@ -61,17 +62,18 @@ jobs:
             --out reports \
             --failOnCVSS 7.0 \
             --data ~/.dependency-check/data \
-            --nvdApiKey "$NVD_API_KEY"
+            --nvdApiKey "$NVD_API_KEY" \
+            --nvdApiDelay 8000
 
-      - name: 📤 Upload OWASP Report
+      - name: 📤 Upload Dependency-Check Report
         uses: actions/upload-artifact@v4
         with:
           name: dependency-check-report
           path: reports
 
-      # -------------------------------
-      # 📊 SONARQUBE ANALYSIS
-      # -------------------------------
+      # -------------------------------------
+      # 📊 SonarQube Analysis
+      # -------------------------------------
 
       - name: 📊 Run SonarQube Analysis
         env:
@@ -82,11 +84,11 @@ jobs:
             -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
             -Dsonar.login=${{ secrets.SONAR_TOKEN }}
 
-      # -------------------------------
-      # 🧪 DEBUG AWS CREDENTIALS
-      # -------------------------------
+      # -------------------------------------
+      # 🧪 AWS Credentials Check
+      # -------------------------------------
 
-      - name: 🧪 Debug AWS credentials presence
+      - name: ✅ Validate AWS Credentials
         shell: bash
         run: |
           if [ -z "$AWS_ACCESS_KEY_ID" ]; then
@@ -96,9 +98,9 @@ jobs:
             echo "✅ AWS_ACCESS_KEY_ID is set"
           fi
 
-      # -------------------------------
-      # 🔐 AWS DEPLOYMENT TO ECR
-      # -------------------------------
+      # -------------------------------------
+      # 🔐 AWS Deployment (ECR)
+      # -------------------------------------
 
       - name: 🔐 Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
