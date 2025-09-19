@@ -43,14 +43,7 @@ jobs:
           --project "heathjavasamplerepo" \
           --scan ./target \
           --format HTML \
-          --out reports \
-          --nvdApiKey $NVD_API_KEY
-
-    - name: 📤 Upload OWASP Report
-      uses: actions/upload-artifact@v4
-      with:
-        name: owasp-dependency-check-report
-        path: reports
+          --out reports
 
     - name: 📊 SonarQube Analysis
       env:
