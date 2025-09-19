@@ -30,10 +30,10 @@ jobs:
         run: ./mvnw clean package
 
       # -------------------------------
-      # 📊 SONARQUBE
+      # 📊 SONARQUBE ANALYSIS
       # -------------------------------
 
-      - name: 📊 SonarQube Analysis
+      - name: 📊 Run SonarQube Analysis
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
@@ -43,28 +43,28 @@ jobs:
             -Dsonar.login=${{ secrets.SONAR_TOKEN }}
 
       # -------------------------------
-      # 🔐 AWS DEPLOYMENT
+      # 🔐 AWS DEPLOYMENT TO ECR
       # -------------------------------
 
-      - name: 🔐 Configure AWS credentials
+      - name: 🔐 Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: 🔐 Login to ECR
+      - name: 🔐 Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: 📦 Ensure ECR Repo Exists
+      - name: 📦 Ensure ECR Repository Exists
         run: |
           aws ecr describe-repositories --repository-names $ECR_REPO_NAME || \
           aws ecr create-repository --repository-name $ECR_REPO_NAME
 
-      - name: 🐳 Build Docker image
+      - name: 🐳 Build Docker Image
         run: |
           docker build -t $ECR_REPO_URI_FINAL/$ECR_REPO_NAME:$IMAGE_TAG .
 
-      - name: 📤 Push Docker image
+      - name: 📤 Push Docker Image to ECR
         run: |
           docker push $ECR_REPO_URI_FINAL/$ECR_REPO_NAME:$IMAGE_TAG
